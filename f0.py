@@ -15,7 +15,7 @@ Min_Piggy = 3000000
 # 最小的能量数量
 Min_Power = 3000000
 # 最小的南瓜数量
-Min_Pumpkin = 3000000
+Min_Pumpkin = 300000
 # 最小的水数量
 Min_Water = 3000000
 # 最小的怪异物质数量
@@ -82,33 +82,43 @@ def plant_pumpkin():
         till()
     return plant(Entities.Pumpkin)
 
+# 尝试种一个仙人掌
+def plant_cactus():
+    if get_ground_type() != Grounds.Soil:
+        till()
+    return plant(Entities.Cactus)
+
 
 # 判断是不是坏南瓜
 def is_bad_pumpkin():
     if get_entity_type() == Entities.Dead_Pumpkin:
         plant_pumpkin()
 
+
 # 根据输入参数来种植对应的植物
 def plant_entities(entity_type):
     if entity_type == Entities.Bush:
         return plant_wood()
     elif entity_type == Entities.Tree:
-       return plant_tree()
+        return plant_tree()
     elif entity_type == Entities.Carrot:
         return plant_carrot()
     elif entity_type == Entities.Sunflower:
         return plant_sunflower()
     elif entity_type == Entities.Pumpkin:
         return plant_pumpkin()
+    elif entity_type == Entities.Cactus:
+        return plant_cactus()
     else:
         return plant_hay()
 
 
 # 浇水
 def water_plant():
-    if get_water() < 0.6 and num_items(Items.Water) :
+    if get_water() < 0.6 and num_items(Items.Water):
         use_item(Items.Water)
         water_plant()
+
 
 # 施肥
 def fertilize_plant():
@@ -133,18 +143,59 @@ plan_farm = getFram(None)
 # print(farm)
 # 定义一个向日葵花瓣的字典, 用来记录最大的花瓣数
 petals_list = {}
+# 定义一个记录坏南瓜的相关列表
+bad_pumpkin = getFram(None)
+# 是否允许收获南瓜
+allow_harvest_pumpkin = False
+# 是否允许收获仙人掌
+allow_harvest_cactus = False
 world_size = get_world_size()
 
 
 def planting_extra():
-    if get_entity_type() == Entities.Sunflower:
-        x, y = get_pos_x(), get_pos_y()
+    entity_type = get_entity_type()
+    x, y = get_pos_x(), get_pos_y()
+    if entity_type == Entities.Sunflower:
         petal_num = measure()
         values = util.getDictValue(petals_list)
-        if len(values) < Max_Sunflower or petal_num < max(values):
+        if petal_num < 14:
+            pass
+        elif len(values) < Max_Sunflower or petal_num < max(values):
             return False
         petals_list.pop((x, y))
+    elif entity_type == Entities.Dead_Pumpkin:
+        bad_pumpkin[x][y] = False
+        plant_pumpkin()
+    elif entity_type == Entities.Pumpkin:
+        bad_pumpkin[x][y] = None
+        return allow_harvest_pumpkin
     return True
+
+
+def harvest_begins():
+    # 控制南瓜的收获
+    global allow_harvest_pumpkin
+    global allow_harvest_cactus
+    if allow_harvest_pumpkin:
+        allow_harvest_pumpkin = False
+    else:
+        for y in range(world_size):
+            for x in range(world_size):
+                if bad_pumpkin[x][y] == False:
+                    return
+        allow_harvest_pumpkin = True
+
+    # 控制仙人掌的收获
+    # 查找当前地图中的成团的仙人掌
+    cactus_list = []
+    for y in range(world_size):
+        for x in range(world_size):
+            if (
+                farm[x][y] == Entities.Cactus
+                and (x > 0 and farm[x - 1][y] != Entities.Cactus)
+                and (y > 0 and farm[x][y - 1] != Entities.Cactus)
+            ):
+                pass
 
 
 def try_planting():
@@ -153,7 +204,6 @@ def try_planting():
     # 尝试收获
     if get_entity_type() != None:
         if not try_harvest(planting_extra):
-            is_bad_pumpkin()
             return
 
     # 查看当前位置是否已经有计划种植的植物
@@ -184,10 +234,18 @@ def try_planting():
         plant_carrot()
     # 南瓜不够了种南瓜
     elif num_items(Items.Pumpkin) < Min_Pumpkin:
-        plant_pumpkin()
-        # if plant_pumpkin():
-        #     range_xy = util.find_square_region(plan_farm, (x, y), 6)
-        #     util.fill_plan_farm_with_pumpkin(plan_farm, range_xy)
+        my = y % (6 + 1)
+        mx = x % (6 + 1)
+        if my == 6 or mx == 6:
+            plant_carrot()
+        else:
+            plant_pumpkin()
+            fertilize_plant()
+    # 仙人掌不够了种仙人掌
+    elif num_items(Items.Cactus) < Min_Cactus:
+        # if plant_cactus():
+        # try_fill_cactus(x, y, plan_farm)
+        plant_cactus()
 
     # fertilize_plant()
     farm[x][y] = get_entity_type()
@@ -199,7 +257,8 @@ def try_planting():
             plant_type, (x, y) = companion
             plan_farm[x][y] = plant_type
 
-def inspection(fun=util._always_true):
+
+def inspection(handle=util._always_true, harvest_begins=util._always_true):
     world_size = get_world_size()
     direction_x = East
     direction_y = North
@@ -216,14 +275,55 @@ def inspection(fun=util._always_true):
             if x == 0:
                 direction_x = East
             # pass
-            fun()
+            handle()
             move(direction_x)
         # 完成一行的遍历后，执行函数并向上移动到下一行
-        fun()
+        handle()
         move(direction_y)
+    harvest_begins()
 
 
+# 尝试收获当前格子的植物
 def try_harvest(fun=util._always_true):
-    if can_harvest() and fun():
+    if fun() and can_harvest():
         return harvest()
     return False
+
+
+# 尝试填写计划种植的仙人掌
+def try_fill_cactus(x, y,plan_farm):
+    world_size = get_world_size()
+    extra = 1
+    row = []
+    col = []
+    not_entities = True
+
+    plan_farm[x][y] = Entities.Cactus
+
+    while not_entities and x + extra < world_size and y + extra < world_size:
+        if not_entities:
+            for i in range(extra):
+                if plan_farm[x + extra][y + i] == None:
+                    row.append((x + extra, y + i))
+                else:
+                    not_entities = False
+                    break
+            row.append((x + extra, y + extra))
+
+        if not_entities:
+            for j in range(extra):
+                if plan_farm[x + j][y + extra] == None:
+                    col.append((x + j, y + extra))
+                else:
+                    not_entities = False
+                    break
+
+        if not_entities:
+            for i in range(len(row)):
+                plan_farm[row[i][0]][row[i][1]] = Entities.Cactus
+            for j in range(len(col)):
+                plan_farm[col[j][0]][col[j][1]] = Entities.Cactus
+
+            row = []
+            col = []
+            extra = extra + 1

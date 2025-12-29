@@ -1,9 +1,8 @@
-def getDictValue(dict):
+def get_dict_value(dict):
     value = []
     for key in dict:
         value.append(dict[key])
     return value
-
 
 
 def random_elem(lst):

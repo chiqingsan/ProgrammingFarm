@@ -333,8 +333,8 @@ def try_harvest_pumpkin():
         entity_type = get_entity_type()
 
         if entity_type == Entities.Dead_Pumpkin or entity_type == None:
-                config.bad_pumpkin_list.append((x,y))
-                plant_pumpkin()
+            config.bad_pumpkin_list.append((x,y))
+            plant_pumpkin()
         elif entity_type == Entities.Pumpkin and not can_harvest():
             # 如果是南瓜, 但是不可以收获, 则说明还没有成熟, 记录下来
             config.bad_pumpkin_list.append((x,y))
@@ -351,14 +351,52 @@ def try_harvest_pumpkin():
                 new_bad_pumpkin_list.append(pos)
             elif entity_type == Entities.Pumpkin and not can_harvest():
                 new_bad_pumpkin_list.append(pos)
-        
+
         config.bad_pumpkin_list = new_bad_pumpkin_list
         is_all_good = len(new_bad_pumpkin_list) == 0
-        
-    
+
     util.goto_xy(0, 0)
 
 
+# 尝试寻找迷宫中的宝藏
+def try_finding_treasure(treasure_size=None):
+    # 不在迷宫里就生成新迷宫
+    entity_type = get_entity_type()
+    if entity_type != Entities.Treasure and entity_type != Entities.Hedge:
+        plant(Entities.Bush)
+        if treasure_size == None:
+            treasure_size = get_world_size() * 2 ** (num_unlocked(Unlocks.Mazes) - 1)
+        use_item(Items.Weird_Substance, treasure_size)
+
+    treasure_x, treasure_y = measure()
+
+    directions = [North, East, South, West]
+    index = 0
+
+    # 贴墙走到宝藏
+    while (get_pos_x(), get_pos_y()) != (treasure_x, treasure_y):
+        right = (index + 1) % 4
+        if can_move(directions[right]):
+            index = right
+            move(directions[index])
+            continue
+
+        if can_move(directions[index]):
+            move(directions[index])
+            continue
+
+        left = (index - 1) % 4
+        if can_move(directions[left]):
+            index = left
+            move(directions[index])
+            continue
+
+        back = (index + 2) % 4
+        index = back
+        move(directions[index])
+
+    # 到宝藏 → 收获 → 这一局迷宫结束
+    try_harvest()
 
 
 def inspection(handle=util._always_true, harvest_begins=util._always_true):

@@ -14,4 +14,13 @@ while(True):
     # elif (num_items(Items.Power) < config.Min_Power):
     #     work.inspection(work.try_planting_sunflower,work.harvest_sunflower_max)
     # elif (num_items(Items.Pumpkin) < config.Min_Pumpkin):
-    work.inspection(work.try_planting_pumpkin,work.try_harvest_pumpkin)
+    #     work.inspection(work.try_planting_pumpkin,work.try_harvest_pumpkin)
+    # elif num_items(Items.Gold) < config.Min_Gold:
+    work.try_finding_treasure()
+
+# clear()
+# plant(Entities.Bush)
+# substance = get_world_size() * 2**(num_unlocked(Unlocks.Mazes) - 1)
+# use_item(Items.Weird_Substance, substance)
+
+# work.try_finding_treasure()

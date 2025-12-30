@@ -465,11 +465,12 @@ def try_feed_dinosaur():
         world_size -= 1
         set_world_size(world_size)
 
+    # 上次选择的方向
+    last_direction = East
     # 返回：新的朝向；若四个方向都走不动，返回 None
     def walk_step():
+        global last_direction
         path = []
-        x, y = get_pos_x(), get_pos_y()
-        world_size = get_world_size()
 
         if can_move(West):
             path.append(West)
@@ -481,24 +482,13 @@ def try_feed_dinosaur():
             path.append(South)
 
         if len(path) == 1:
+            last_direction = path[0]
             return move(path[0])
         elif len(path) > 1:
-            # 如果可走的方向大于1, 则选靠近墙的一侧方向
-            num = max(x, y)
-            if num > world_size / 2:
-                if North in path:
-                    return move(North)
-                elif East in path:
-                    return move(East)
-                else:
-                    return move(path[0])
-            else:
-                if South in path:
-                    return move(South)
-                elif West in path:
-                    return move(West)
-                else:
-                    return move(path[0])
+            if last_direction in path:
+                return move(last_direction)
+            last_direction = util.random_elem(path)
+            return move(last_direction)
         # 四个方向都走不动，说明被包住了
         return None
 
@@ -598,6 +588,11 @@ def try_feed_dinosaur():
         if get_entity_type() == Entities.Apple:
             apples = apples + 1
             next_x, next_y = measure()
+            for p in range(apples):
+                if get_entity_type() == Entities.Apple:
+                    break
+                if not move(East):
+                    break
 
         # 无论现在是不是在苹果上，都尝试朝目标走
         if not move_to_target(next_x, next_y):

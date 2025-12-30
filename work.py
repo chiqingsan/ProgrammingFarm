@@ -26,23 +26,30 @@ def plant_wood():
 # @param farm_map: 二维列表, 代表农场的地图
 # 尝试种一棵树, 如果周围有树则种灌木.
 # 如果 farm_map 为空则直接种树.
-def plant_tree(farm_map=[]):
-    if len(farm_map) == 0:
-        return plant(Entities.Tree)
-    world_size = get_world_size()
-    x = get_pos_x()
-    y = get_pos_y()
-    # 1. 检查四个方向，并将结果存入变量
-    has_tree_up = (y > 0) and (config.farm[x][y - 1] == Entities.Tree)
-    has_tree_down = (y < world_size - 1) and (config.farm[x][y + 1] == Entities.Tree)
-    has_tree_left = (x > 0) and (config.farm[x - 1][y] == Entities.Tree)
-    has_tree_right = (x < world_size - 1) and (config.farm[x + 1][y] == Entities.Tree)
+def plant_tree():
+    # if len(farm_map) == 0:
+    #     return plant(Entities.Tree)
+    # world_size = get_world_size()
+    # x = get_pos_x()
+    # y = get_pos_y()
+    # # 1. 检查四个方向，并将结果存入变量
+    # has_tree_up = (y > 0) and (config.farm[x][y - 1] == Entities.Tree)
+    # has_tree_down = (y < world_size - 1) and (config.farm[x][y + 1] == Entities.Tree)
+    # has_tree_left = (x > 0) and (config.farm[x - 1][y] == Entities.Tree)
+    # has_tree_right = (x < world_size - 1) and (config.farm[x + 1][y] == Entities.Tree)
 
-    # 2. 用 or 连接所有变量
-    if has_tree_up or has_tree_down or has_tree_left or has_tree_right:
-        return plant_wood()
+    # # 2. 用 or 连接所有变量
+    # if has_tree_up or has_tree_down or has_tree_left or has_tree_right:
+    #     return plant_wood()
+    # else:
+    #     return plant(Entities.Tree)
+    x,y = get_pos_x(), get_pos_y()
+    if ((x+y) % 2) == 0 :
+        plant(Entities.Tree)
     else:
-        return plant(Entities.Tree)
+        if get_ground_type() == Grounds.Soil:
+            till()
+        plant(Entities.Bush)
 
 
 # 尝试种一个向日葵
@@ -217,7 +224,7 @@ def try_planting_common_crops():
         if not try_harvest():
             return
 
-        # 查看当前位置是否已经有计划种植的植物
+    # 查看当前位置是否已经有计划种植的植物
     if config.plan_farm[x][y] != None:
         if plant_entities(config.plan_farm[x][y]):
             # 混合种植之后, 删掉当前位置的种植计划
@@ -229,20 +236,20 @@ def try_planting_common_crops():
         plant_hay()
     # 木头不够种树
     elif num_items(Items.Wood) < config.Min_Wood:
-        plant_tree(config.farm)
+        plant_tree()
     # 胡萝卜不够了种胡萝卜
     elif num_items(Items.Carrot) < config.Min_Carrot:
         plant_carrot()
     else:
-        # 都够了就种草来兜底
-        plant_hay()
+        # 都够了就随机种一个
+        util.random_elem([plant_hay, plant_tree, plant_carrot])()
 
     # 尝试进行混合种植, 同时只允许胡萝卜和树可以混合种植
-    if config.farm[x][y] == Entities.Carrot or config.farm[x][y] == Entities.Tree:
-        companion = get_companion()
-        if companion != None:
-            plant_type, (x, y) = companion
-            config.plan_farm[x][y] = plant_type
+    # if config.farm[x][y] == Entities.Carrot or config.farm[x][y] == Entities.Tree:
+    companion = get_companion()
+    if companion != None:
+        plant_type, (x, y) = companion
+        config.plan_farm[x][y] = plant_type
 
 
 # 尝试种植向日葵
@@ -261,25 +268,6 @@ def try_planting_sunflower():
 
 # 种植完向日葵之后尝试以最大收益收获向日葵
 def harvest_sunflower_max():
-    # list = util.get_dict_value(config.petals_dict)
-
-    # if not list:
-    #     util.goto_xy(0, 0)
-    #     return
-
-    # max_petal = max(list)
-    # del_key = []
-    # for pos in config.petals_dict:
-    #     if config.petals_dict[pos] == max_petal:
-    #         util.goto_xy(pos[0], pos[1])
-    #         if try_harvest():
-    #             del_key.append(pos)
-
-    # if del_key:
-    #     for key in del_key:
-    #         config.petals_dict.pop(key)
-
-    # harvest_sunflower_max()
     tmp_petals = dict()   # {花瓣数: [坐标列表]}
 
     # pos -> petals  转  petals -> [pos...]
@@ -423,6 +411,317 @@ def inspection(handle=util._always_true, harvest_begins=util._always_true):
                 direction_x = East
 
     harvest_begins()
+
+
+# 尝试种植仙人掌
+def try_planting_cactus():
+    # 尝试收获
+    if get_entity_type() != None:
+        try_harvest()
+
+    plant_cactus()
+
+
+# 对仙人掌进行排序, 并且收获仙人掌
+def try_sort_and_harvest_cactus():    
+    n = get_world_size()
+
+    # ① 逐行冒泡：每行从左到右升序
+    for h in range(n):
+        for i in range(n):
+            util.goto_xy(0, h)
+            swapped = False
+            for j in range(0, n - i - 1):
+                if measure() > measure(East):
+                    swap(East)
+                    swapped = True
+                move(East)
+            if not swapped:
+                break  # 这一行已经有序，提前结束
+
+    # ② 逐列冒泡：每列从下到上升序
+    for w in range(n):
+        for i in range(n):
+            util.goto_xy(w, 0)
+            swapped = False
+            for j in range(0, n - i - 1):
+                if measure() > measure(North):
+                    swap(North)
+                    swapped = True
+                move(North)
+            if not swapped:
+                break  # 这一列已经有序，提前结束
+
+    # ③ 回到原点开始连锁收割
+    util.goto_xy(0, 0)
+    try_harvest()
+
+
+
+# 尝试养恐龙来收获骨头
+def try_feed_dinosaur_123():
+    set_world_size(12)
+    world_size = get_world_size()
+
+    # 确保世界大小为偶数（当前逻辑依赖偶数尺寸）
+    if world_size % 2 != 0:
+        world_size -= 1
+        set_world_size(world_size)
+        
+
+    # 换上恐龙帽，开始养恐龙
+    change_hat(Hats.Dinosaur_Hat)
+
+    # 无限循环沿着预设路径移动，直到某一步 move() 失败
+    while True:
+        direction_x = East   # 水平移动方向（当前行）
+        direction_y = North  # 垂直移动方向（换行时）
+
+        # 蛇形遍历每一行，并在最后一行做一段“回到底边”的闭环
+        for i in range(world_size):
+            # ── 横向移动部分 ──
+            if i == 0:
+                # 第一行：水平走 world_size - 1 步
+                for j in range(world_size - 1):
+                    if not move(direction_x):
+                        # 撞墙或尾巴，收尾巴结束
+                        change_hat(Hats.Green_Hat)
+                        return
+            else:
+                # 中间行 & 最后一行：先走 world_size - 2 步
+                for j in range(world_size - 2):
+                    if not move(direction_x):
+                        change_hat(Hats.Green_Hat)
+                        return
+
+                    # 在最后一行的特定位置额外处理一次：
+                    # 再多走一格 + 整列向下，形成闭环
+                    if i == world_size - 1 and j == world_size - 3:
+                        # 再向当前横向方向多走 1 步
+                        if not move(direction_x):
+                            change_hat(Hats.Green_Hat)
+                            return
+
+                        # 再向下走 world_size - 1 步，回到底行
+                        for k in range(world_size - 1):
+                            if not move(South):
+                                change_hat(Hats.Green_Hat)
+                                return
+
+            # ── 换行部分（从当前行移动到下一行）──
+            if i < world_size - 1:
+                if not move(direction_y):
+                    change_hat(Hats.Green_Hat)
+                    return
+
+                # 换行后水平方向反转，实现蛇形
+                if direction_x == East:
+                    direction_x = West
+                else:
+                    direction_x = East
+
+# ================== 辅助函数：简单朝目标走（贪心直线） ==================
+
+# 贪心朝 (tx, ty) 走，返回 True=成功到达，False=中途撞墙/尾巴
+def move_to_target(tx, ty):
+    while True:
+        x = get_pos_x()
+        y = get_pos_y()
+
+        if x == tx and y == ty:
+            return True  # 已到目标
+
+        if x < tx:
+            if not move(East):
+                return False
+        elif x > tx:
+            if not move(West):
+                return False
+        elif y < ty:
+            if not move(North):
+                return False
+        elif y > ty:
+            if not move(South):
+                return False
+
+
+# ================== 辅助函数：前期乱逛一步（避免太快撞死） ==================
+
+def walk_simple(direction):
+    # direction：当前前进方向
+    # 返回：新的方向；若四面都走不动，返回 None
+
+    def turn_left(dir):
+        if dir == North:
+            return West
+        if dir == West:
+            return South
+        if dir == South:
+            return East
+        return North  # East
+
+    def turn_right(dir):
+        if dir == North:
+            return East
+        if dir == East:
+            return South
+        if dir == South:
+            return West
+        return North  # West
+
+    def turn_back(dir):
+        if dir == North:
+            return South
+        if dir == South:
+            return North
+        if dir == East:
+            return West
+        return East  # West
+
+    # 1️⃣ 先尝试原方向
+    if move(direction):
+        return direction
+
+    # 2️⃣ 左转
+    left_dir = turn_left(direction)
+    if move(left_dir):
+        return left_dir
+
+    # 3️⃣ 右转
+    right_dir = turn_right(direction)
+    if move(right_dir):
+        return right_dir
+
+    # 四个方向都走不动，说明被包住了
+    return None
+
+
+# ================== 辅助函数：蛇形大循环（你原来的逻辑，稍微包了一层） ==================
+
+def snake_loop(world_size):
+    while True:
+        # 先滑到左边界，再滑到底边，尽量从左下角开始蛇形
+        while move(West):
+            pass
+        while move(South):
+            pass
+
+        direction_x = East   # 水平移动方向
+        direction_y = North  # 换行方向（向上）
+
+        # 蛇形遍历每一行，并在最后一行做一段“回到底边”的闭环
+        for i in range(world_size):
+            # ── 横向移动部分 ──
+            if i == 0:
+                # 第一行：水平走 world_size - 1 步
+                j = 0
+                while j < world_size - 1:
+                    if not move(direction_x):
+                        # 蛇形阶段：一旦走不动，直接收割
+                        change_hat(Hats.Green_Hat)
+                        return
+                    j = j + 1
+            else:
+                # 中间行 & 最后一行：先走 world_size - 2 步
+                j = 0
+                while j < world_size - 2:
+                    if not move(direction_x):
+                        change_hat(Hats.Green_Hat)
+                        return
+
+                    # 在最后一行的特定位置额外处理一次：
+                    # 再多走一格 + 整列向下，形成闭环
+                    if i == world_size - 1 and j == world_size - 3:
+                        # 再向当前横向方向多走 1 步
+                        if not move(direction_x):
+                            change_hat(Hats.Green_Hat)
+                            return
+
+                        # 再向下走 world_size - 1 步，回到底行
+                        k = 0
+                        while k < world_size - 1:
+                            if not move(South):
+                                change_hat(Hats.Green_Hat)
+                                return
+                            k = k + 1
+
+                    j = j + 1
+
+            # ── 换行部分（从当前行移动到下一行）──
+            if i < world_size - 1:
+                if not move(direction_y):
+                    change_hat(Hats.Green_Hat)
+                    return
+
+                # 换行后水平方向反转，实现蛇形
+                if direction_x == East:
+                    direction_x = West
+                else:
+                    direction_x = East
+
+
+# ================== 主函数：前期吃苹果 + 后期蛇形 ==================
+
+def try_feed_dinosaur():
+    # 地图大小：按需要调整
+    set_world_size(12)
+    world_size = get_world_size()
+
+    # 逻辑依赖偶数尺寸，保证为偶数
+    if world_size % 2 != 0:
+        world_size = world_size - 1
+        set_world_size(world_size)
+
+    # 戴上恐龙帽
+    change_hat(Hats.Dinosaur_Hat)
+
+    apples = 0
+    APPLE_LIMIT = 15  # 吃到这个数量后切换蛇形（可调）
+
+    direction_walk = East  # 前期乱逛的初始方向
+    next_x = 0
+    next_y = 0
+
+    # ========= 前期：主动吃苹果阶段 =========
+    while apples < APPLE_LIMIT:
+        if get_entity_type() == Entities.Apple:
+            apples = apples + 1
+
+            # 在苹果上时，measure() 返回下一颗苹果的位置
+            next_x, next_y = measure()
+
+            # 贪心朝下一颗苹果走
+            if not move_to_target(next_x, next_y):
+                # ❗ 这里不再立刻收割：
+                #    撞到了，就尝试用 walk_simple 换个方向继续挣扎
+                new_dir = walk_simple(direction_walk)
+                if new_dir == None:
+                    # 四个方向都走不动，才真正收割
+                    change_hat(Hats.Green_Hat)
+                    return
+                direction_walk = new_dir
+        else:
+            # 没踩在苹果上，就用简单规则在场地里乱逛
+            move(direction_walk)
+            if not move_to_target(next_x, next_y):
+                # ❗ 这里不再立刻收割：
+                #    撞到了，就尝试用 walk_simple 换个方向继续挣扎
+                new_dir = walk_simple(direction_walk)
+                if new_dir == None:
+                    # 四个方向都走不动，才真正收割
+                    change_hat(Hats.Green_Hat)
+                    return
+                direction_walk = new_dir
+            # new_dir = walk_simple(direction_walk)
+            # if new_dir == None:
+            #     # 四个方向都走不动，被完全包住了，收割
+            #     change_hat(Hats.Green_Hat)
+            #     return
+            # direction_walk = new_dir
+
+    # ========= 后期：蛇形大循环阶段 =========
+    snake_loop(world_size)
+
 
 
 # 尝试收获当前格子的植物

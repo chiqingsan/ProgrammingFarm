@@ -30,15 +30,11 @@ def goto_xy(x,y):
 
     # 按方向移动
     if dx > 0:
-        i = 0
-        while i < dx:
+        for _ in range(dx):
             move(East)
-            i = i + 1
     elif dx < 0:
-        i = 0
-        while i < -dx:
+        for _ in range(-dx):
             move(West)
-            i = i + 1
 
     # ---------- Y 轴 ----------
     dy = y - now_y
@@ -49,12 +45,8 @@ def goto_xy(x,y):
         dy = dy + world_size
 
     if dy > 0:
-        i = 0
-        while i < dy:
+        for _ in range(dy):
             move(North)
-            i = i + 1
     elif dy < 0:
-        i = 0
-        while i < -dy:
+        for _ in range(-dy):
             move(South)
-            i = i + 1

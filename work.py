@@ -460,16 +460,25 @@ def try_sort_and_harvest_cactus():
 
 # 尝试养恐龙来收获骨头
 def try_feed_dinosaur():
+    start_time = get_time()
+    
+    def log_fun(start, apple_num):
+        # 计算吃一个苹果所需要的平均时间
+        time = get_time() - start
+        quick_print("本轮贪吃蛇已结束, 所耗时间为(单位: s)：" + str(time))
+        quick_print("本轮贪吃蛇已结束, 吃掉的苹果数量为：" + str(apple_num))
+        quick_print("本轮贪吃蛇已结束, 吃一个苹果所需的平均时间为(单位: s)：" + str(time/apple_num))
+        quick_print("本轮贪吃蛇已结束, 骨头生产效率为(单位: /s)：" + str(apple_num**2 / time))
+        quick_print("-------------------------------------------------------------------")
+
+    # 先保证世界的大小为偶数
     world_size = get_world_size()
     if world_size % 2 != 0:
         world_size -= 1
         set_world_size(world_size)
 
-    # 上次选择的方向
-    last_direction = East
-    # 返回：新的朝向；若四个方向都走不动，返回 None
-    def walk_step():
-        global last_direction
+    # 选择一个新的方向进行移动；若四个方向都走不动，返回 None
+    def try_safe_step():
         path = []
 
         if can_move(West):
@@ -482,23 +491,50 @@ def try_feed_dinosaur():
             path.append(South)
 
         if len(path) == 1:
-            last_direction = path[0]
             return move(path[0])
         elif len(path) > 1:
-            if last_direction in path:
-                return move(last_direction)
-            last_direction = util.random_elem(path)
-            return move(last_direction)
+            if (get_pos_x() + get_pos_y()) < world_size:
+                if North in path:
+                    return move(North)
+                elif East in path:
+                    return move(East)
+                else:
+                    return move(path[0])
+            else:
+                if South in path:
+                    return move(South)
+                elif West in path:
+                    return move(West)
+                else:
+                    return move(path[0])
         # 四个方向都走不动，说明被包住了
         return None
 
+    # 贪心朝 (tx, ty) 走，返回 True=成功到达，False=中途撞墙/尾巴
+    def move_to_target(tx, ty):
+        while True:
+            x = get_pos_x()
+            y = get_pos_y()
+
+            if x == tx and y == ty:
+                return True  # 已到目标
+
+            if x < tx:
+                if not move(East):
+                    return False
+            elif x > tx:
+                if not move(West):
+                    return False
+            elif y < ty:
+                if not move(North):
+                    return False
+            elif y > ty:
+                if not move(South):
+                    return False
+
+    # 蛇形循环, 直到身体铺满整个农场
     def snake_loop(world_size):
         while True:
-            # 先滑到左边界，再滑到底边，尽量从左下角开始蛇形
-            while move(West):
-                pass
-            while move(South):
-                pass
 
             direction_x = East  # 水平移动方向
             direction_y = North  # 换行方向（向上）
@@ -553,31 +589,11 @@ def try_feed_dinosaur():
                     else:
                         direction_x = East
 
-    # 贪心朝 (tx, ty) 走，返回 True=成功到达，False=中途撞墙/尾巴
-    def move_to_target(tx, ty):
-        while True:
-            x = get_pos_x()
-            y = get_pos_y()
-
-            if x == tx and y == ty:
-                return True  # 已到目标
-
-            if x < tx:
-                if not move(East):
-                    return False
-            elif x > tx:
-                if not move(West):
-                    return False
-            elif y < ty:
-                if not move(North):
-                    return False
-            elif y > ty:
-                if not move(South):
-                    return False
-
-    apples = 0
+    # 吃苹果的阈值, 大于该阈值之后, 转换策略, 改为蛇形循环
     APPLE_LIMIT = world_size * 2
 
+    # 已经吃掉的苹果数
+    apples = 0
     next_x = 0
     next_y = 0
 
@@ -588,22 +604,53 @@ def try_feed_dinosaur():
         if get_entity_type() == Entities.Apple:
             apples = apples + 1
             next_x, next_y = measure()
-            for p in range(apples):
+            
+            # 先判断是在上半还是下半
+            x, y = get_pos_x(), get_pos_y()
+            dis = []
+            if (x + y) < world_size:
+                dis = [North, East]
+                if not can_move(dis[0]):
+                    dis[0], dis[1] = dis[1], dis[0]
+            else:
+                dis = [South, West]
+                if not can_move(dis[0]):
+                    dis[0], dis[1] = dis[1], dis[0]
+            for i in range(apples):
+                if not move(dis[0]):
+                    break
                 if get_entity_type() == Entities.Apple:
+                    apples = apples + 1
+                    next_x, next_y = measure()
+            for j in range(apples):
+                if not move(dis[1]):
                     break
-                if not move(East):
-                    break
+                if get_entity_type() == Entities.Apple:
+                    apples = apples + 1
+                    next_x, next_y = measure()
 
         # 无论现在是不是在苹果上，都尝试朝目标走
         if not move_to_target(next_x, next_y):
-            # 朝目标走失败（撞了 / 卡住）→ 尝试按“右手贴墙”走一步
-            new_dir = walk_step()
-            if new_dir == None:
+            move_result = try_safe_step()
+            if move_result == None:
                 change_hat(Hats.Green_Hat)
+                # 计算吃一个苹果所需要的平均时间
+                log_fun(start_time, apples)
                 return
 
     # 前期结束 → 进入 snake_loop(world_size)
+    # 先回到坐标0, 0
+    while not move_to_target(0, 0):
+        move_result = try_safe_step()
+        if move_result == None:
+            change_hat(Hats.Green_Hat)
+            # 计算吃一个苹果所需要的平均时间
+            log_fun(start_time, apples)
+            return
+
     snake_loop(world_size)
+    # 计算吃一个苹果所需要的平均时间
+    log_fun(start_time, world_size**2)
 
 
 # 尝试收获当前格子的植物

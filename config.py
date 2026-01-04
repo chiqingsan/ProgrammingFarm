@@ -1,3 +1,5 @@
+import util
+
 # 最小的骨头数量
 Min_Bone = 3000000
 # 最小的仙人掌数量
@@ -8,7 +10,6 @@ Min_Carrot = 300000
 Min_Gold = 300000
 # 最小的干草数量
 Min_Hay = 300000
-Min_Piggy = 3000000
 # 最小的能量数量
 Min_Power = 30000
 # 最小的南瓜数量
@@ -18,23 +19,12 @@ Min_Weird_Substance = 3000000
 # 最小的木头数量
 Min_Wood = 300000
 
-def getFram(entities=Entities.Grass):
-    farm = []
-    world_size = get_world_size()
-    for i in range(world_size):  # 循环创建每一行
-        row = []  # 2. 为每一行创建一个空的列表
-        for j in range(world_size):  # 循环填充这一行的每一列
-            row.append(entities)  # 3. 把元素添加到行列表的末尾
-        farm.append(row)  # 4. 把填充好的行添加到 farm 列表的末尾
-    return farm
-
-
-farm = getFram()
 # 创建一个计划种植的农场地图
-plan_farm = getFram(None)
-# print(farm)
+plan_farm = util.getFram()
 # 定义一个向日葵花瓣的字典, 用来记录最大的花瓣数
 petals_dict = {}
 # 定义一个记录坏南瓜的相关列表
 bad_pumpkin_list = []
+# 配置需要施肥的作物
+need_fertilize = [Entities.Pumpkin, Entities.Cactus, Entities.Sunflower]
 

@@ -2,66 +2,59 @@ import util
 import config
 
 
-# 尝试种一个胡萝卜
+# 尝试种一个胡萝卜, 返回种植结果True/False
 def plant_carrot():
     if get_ground_type() != Grounds.Soil:
         till()
     return plant(Entities.Carrot)
 
 
-# 尝试种一个干草
+# 尝试种一个干草, 返回种植结果True/False
 def plant_hay():
     if get_ground_type() == Grounds.Soil:
         till()
     return True
 
 
-# 尝试种一个灌木
+# 尝试种一个灌木, 返回种植结果True/False
 def plant_wood():
     if get_ground_type() == Grounds.Soil:
         till()
     return plant(Entities.Bush)
 
 
-# 尝试种一棵树, 如果位置不符合要求则种灌木
+# 尝试种一棵树, 如果位置不符合要求则种灌木, 返回种植结果True/False
 def plant_tree():
     x, y = get_pos_x(), get_pos_y()
     if ((x + y) % 2) == 0:
-        plant(Entities.Tree)
+        return plant(Entities.Tree)
     else:
         if get_ground_type() == Grounds.Soil:
             till()
-        plant(Entities.Bush)
+        return plant(Entities.Bush)
 
 
-# 尝试种一个向日葵
+# 尝试种一个向日葵, 返回种植结果True/False
 def plant_sunflower():
     if get_ground_type() != Grounds.Soil:
         till()
     return plant(Entities.Sunflower)
 
 
-# 尝试种一个南瓜
+# 尝试种一个南瓜, 返回种植结果True/False
 def plant_pumpkin():
     if get_ground_type() != Grounds.Soil:
         till()
     return plant(Entities.Pumpkin)
 
 
-# 尝试种一个仙人掌
+# 尝试种一个仙人掌, 返回种植结果True/False
 def plant_cactus():
     if get_ground_type() != Grounds.Soil:
         till()
     return plant(Entities.Cactus)
 
-
-# 判断是不是坏南瓜
-def is_bad_pumpkin():
-    if get_entity_type() == Entities.Dead_Pumpkin:
-        plant_pumpkin()
-
-
-# 根据输入参数来种植对应的植物
+# 根据输入参数来种植对应的植物, 返回种植结果True/False
 def plant_entities(entity_type):
     if entity_type == Entities.Bush:
         return plant_wood()
@@ -89,6 +82,11 @@ def water_plant():
 def fertilize_plant():
     if num_items(Items.Fertilizer):
         use_item(Items.Fertilizer)
+
+# 根据配置, 决定是否需要施肥
+def try_fertilize_plant():
+    if get_entity_type() in config.need_fertilize:
+        fertilize_plant()
 
 
 # 尝试种植常规作物
@@ -123,6 +121,48 @@ def try_planting_common_crops():
         plant_type, (x, y) = companion
         config.plan_farm[x][y] = plant_type
 
+# 多无人机混合种植
+def drones_plant_common_crops():
+    wrold_size = get_world_size()
+
+    # 种植任务
+    def _plant_common_crops():
+        plan_farm = dict()
+        # 尝试收获
+        if get_entity_type() != None:
+            try_harvest()
+
+        for i in range(wrold_size):
+            if num_items(Items.Hay) < config.Min_Hay:
+                plant_hay()
+            # 木头不够种树
+            elif num_items(Items.Wood) < config.Min_Wood:
+                plant_tree()
+            # 胡萝卜不够了种胡萝卜
+            elif num_items(Items.Carrot) < config.Min_Carrot:
+                plant_carrot()
+            else:
+                # 都够了就随机种一个
+                util.random_elem([plant_hay, plant_tree, plant_carrot])()
+            
+            # 记录偏好作物和位置
+            companion = get_companion()
+            if companion != None:
+                plant_type, (x, y) = companion
+                plan_farm[(x,y)] = plant_type
+            
+            move(East)
+        
+        for pos in plan_farm:
+            util.goto_xy(pos[0], pos[1])
+            if get_entity_type() != None:
+                try_harvest()
+            plant_entities(plan_farm[pos])
+
+    util.do_spawn_drone(_plant_common_crops)
+
+
+
 
 # 尝试种植向日葵
 def try_planting_sunflower():
@@ -132,9 +172,11 @@ def try_planting_sunflower():
     if get_entity_type() != None:
         try_harvest()
 
-    if num_items(Items.Power) < config.Min_Power and num_items(Items.Carrot):
-        if plant_sunflower():
+    if plant_sunflower():
             config.petals_dict[(x, y)] = measure()
+            # 查询是否需要施肥
+            try_fertilize_plant()
+        
 
 
 # 种植完向日葵之后尝试以最大收益收获向日葵
@@ -156,7 +198,8 @@ def harvest_sunflower_max():
         if p in tmp_petals:
             for pos in tmp_petals[p]:
                 util.goto_xy(pos[0], pos[1])
-                try_harvest()
+                while not try_harvest():
+                    do_a_flip()
         p -= 1
 
     config.petals_dict = dict()
@@ -173,6 +216,8 @@ def drones_plant_sunflower():
             try_harvest()
             if plant_sunflower():
                 petals_dict[(x, y)] = measure()
+                # 查询是否需要施肥
+                try_fertilize_plant()
             move(East)
         return petals_dict
 
@@ -230,6 +275,8 @@ def try_planting_pumpkin():
         plant_carrot()
     else:
         plant_pumpkin()
+        # 查询是否需要施肥
+        try_fertilize_plant()
 
 
 # 尝试收获南瓜, 补种坏掉的南瓜, 直到完好后收获
@@ -269,14 +316,61 @@ def try_harvest_pumpkin():
     util.goto_xy(0, 0)
 
 
+# 多无人机种植收获南瓜
+def drones_plant_pumpkin():
+    world_size = get_world_size()
+
+    # 播种任务, 尝试种植南瓜
+    def plant_pumpkin_task():
+        for i in range(world_size):
+            try_planting_pumpkin()
+            move(East)
+
+    # 南瓜补种任务, 补种坏掉的南瓜
+    def replant_pumpkin_task():
+        replant_list = []
+        for i in range(world_size):
+            x, y = get_pos_x(), get_pos_y()
+            entity_type = get_entity_type()
+            if entity_type == Entities.Dead_Pumpkin or entity_type == None:
+                replant_list.append((x, y))
+                plant_pumpkin()
+                # 查询是否需要施肥
+                try_fertilize_plant()
+            elif entity_type == Entities.Pumpkin and not can_harvest():
+                replant_list.append((x, y))
+            move(East)
+        
+        while len(replant_list):
+            new_replant_list = []
+            for pos in replant_list:
+                util.goto_xy(pos[0], pos[1])
+                entity_type = get_entity_type()
+                if entity_type == Entities.Dead_Pumpkin or entity_type == None:
+                    plant_pumpkin()
+                    # 查询是否需要施肥
+                    try_fertilize_plant()
+                    new_replant_list.append(pos)
+                elif entity_type == Entities.Pumpkin and not can_harvest():
+                    new_replant_list.append(pos)
+            replant_list = new_replant_list
+
+    # 先种植南瓜
+    util.do_spawn_drone(plant_pumpkin_task)
+    # 补种南瓜
+    util.do_spawn_drone(replant_pumpkin_task)
+    # 等待全部补种完成
+    util.wait_drones_done()
+
+
+
 # 尝试寻找迷宫中的宝藏
-def try_finding_treasure(treasure_size=None):
+def try_finding_treasure():
     # 不在迷宫里就生成新迷宫
     entity_type = get_entity_type()
+    treasure_size = get_world_size() * 2 ** (num_unlocked(Unlocks.Mazes) - 1)
     if entity_type != Entities.Treasure and entity_type != Entities.Hedge:
         plant(Entities.Bush)
-        if treasure_size == None:
-            treasure_size = get_world_size() * 2 ** (num_unlocked(Unlocks.Mazes) - 1)
         use_item(Items.Weird_Substance, treasure_size)
 
     treasure_x, treasure_y = measure()
@@ -308,6 +402,74 @@ def try_finding_treasure(treasure_size=None):
 
     # 到宝藏 → 收获 → 这一局迷宫结束
     try_harvest()
+
+
+# 多无人机寻找宝藏(单次迷宫版)
+def drones_try_finding_treasure():
+    # 不在迷宫里就生成新迷宫
+    entity_type = get_entity_type()
+    treasure_size = get_world_size() * 2 ** (num_unlocked(Unlocks.Mazes) - 1)
+    if entity_type != Entities.Treasure and entity_type != Entities.Hedge:
+        plant(Entities.Bush)
+        use_item(Items.Weird_Substance, treasure_size)
+
+    # 检查是否还在迷宫里
+    def check_in_maze():
+        entity_type = get_entity_type()
+        return entity_type == Entities.Treasure or entity_type == Entities.Hedge
+
+    def treasure_finding_task(initial_dir = 0):
+        def _treasure_finding_task():
+            directions = [North, East, South, West]
+            index = initial_dir  # 当前朝向
+
+            # 分支探索
+            def spawn_branch(dir_index):
+                move(directions[dir_index])
+                while not spawn_drone(treasure_finding_task(dir_index)):
+                    do_a_flip()
+                back = (dir_index + 2) % 4
+                move(directions[back])
+
+
+            while True:
+                if not check_in_maze():
+                    break
+
+                right = (index + 1) % 4
+                left = (index - 1) % 4
+                front = index
+
+                move_path = []
+
+                if can_move(directions[right]):
+                    move_path.append(right)
+                if can_move(directions[front]):
+                    move_path.append(front)
+                if can_move(directions[left]):
+                    spawn_branch(left)
+
+                if len(move_path) == 1:
+                    move(directions[move_path[0]])
+                    index = move_path[0]
+                elif len(move_path) > 1:
+                    for i in range(1,len(move_path)):
+                        spawn_branch(move_path[i])
+                    move(directions[move_path[0]])
+                    index = move_path[0]
+                elif len(move_path) == 0:
+                    break
+
+            if get_entity_type() == Entities.Treasure:
+                try_harvest()
+
+
+        return _treasure_finding_task
+
+    spawn_drone(treasure_finding_task())
+    util.wait_drones_done()
+
+    
 
 # 蛇形循环整个农场
 def inspection(handle=util._always_true, harvest_begins=util._always_true):
@@ -346,6 +508,8 @@ def try_planting_cactus():
         try_harvest()
 
     plant_cactus()
+    # 查询是否需要施肥
+    try_fertilize_plant()
 
 
 # 对仙人掌进行排序, 并且收获仙人掌
@@ -403,12 +567,6 @@ def drones_plant_cactus():
                 swapped = False
                 for j in range(0, n - i - 1):
                     dir_size = measure(dir)
-                    if dir_size == None:
-                        swap(dir)
-                        plant_cactus()
-                        swap(dir)
-                        dir_size = measure(dir)
-
                     if measure() > dir_size:
                         swap(dir)
                         swapped = True
@@ -627,6 +785,7 @@ def try_feed_dinosaur():
     snake_loop(world_size)
     # 计算吃一个苹果所需要的平均时间
     log_fun(start_time, world_size**2)
+
 
 
 # 尝试收获当前格子的植物

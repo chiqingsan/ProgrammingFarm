@@ -104,20 +104,18 @@ def try_planting_common_crops():
         if plant_entities(config.plan_farm[x][y]):
             # 混合种植之后, 删掉当前位置的种植计划
             config.plan_farm[x][y] = None
-            config.farm[x][y] = get_entity_type()
-            return
-
-    if num_items(Items.Hay) < config.Min_Hay:
-        plant_hay()
-    # 木头不够种树
-    elif num_items(Items.Wood) < config.Min_Wood:
-        plant_tree()
-    # 胡萝卜不够了种胡萝卜
-    elif num_items(Items.Carrot) < config.Min_Carrot:
-        plant_carrot()
     else:
-        # 都够了就随机种一个
-        util.random_elem([plant_hay, plant_tree, plant_carrot])()
+        if num_items(Items.Hay) < config.Min_Hay:
+            plant_hay()
+        # 木头不够种树
+        elif num_items(Items.Wood) < config.Min_Wood:
+            plant_tree()
+        # 胡萝卜不够了种胡萝卜
+        elif num_items(Items.Carrot) < config.Min_Carrot:
+            plant_carrot()
+        else:
+            # 都够了就随机种一个
+            util.random_elem([plant_hay, plant_tree, plant_carrot])()
 
     # 尝试进行混合种植
     companion = get_companion()
@@ -132,8 +130,7 @@ def try_planting_sunflower():
 
     # 尝试收获
     if get_entity_type() != None:
-        if not try_harvest():
-            return
+        try_harvest()
 
     if num_items(Items.Power) < config.Min_Power and num_items(Items.Carrot):
         if plant_sunflower():
@@ -164,6 +161,59 @@ def harvest_sunflower_max():
 
     config.petals_dict = dict()
     util.goto_xy(0, 0)
+
+# 多无人机种植向日葵
+def drones_plant_sunflower():
+    wrold_size = get_world_size()
+    # 种植向日葵任务
+    def _plant_sunflower():
+        petals_dict = dict()
+        for _ in range(wrold_size):
+            x, y = get_pos_x(), get_pos_y()
+            try_harvest()
+            if plant_sunflower():
+                petals_dict[(x, y)] = measure()
+            move(East)
+        return petals_dict
+
+    # 收获向日葵任务
+    def harvest_sunflower(x, y):
+        def _harvest_sunflower():
+            util.goto_xy(x, y)
+            while not try_harvest():
+                do_a_flip()
+
+        return _harvest_sunflower
+
+    # 拿到无人机任务执行的句柄
+    petals_list = util.get_drone_handle_result(util.do_spawn_drone(_plant_sunflower))
+    util.wait_drones_done()
+
+    # 解析句柄里结果
+    for i in petals_list:
+        for k in i:
+            config.petals_dict[k] = i[k]
+
+    tmp_petals = dict()  # {花瓣数: [坐标列表]}
+
+    # pos -> petals  转  petals -> [pos...]
+    for pos in config.petals_dict:
+        petals = config.petals_dict[pos]
+
+        if petals in tmp_petals:
+            tmp_petals[petals].append(pos)
+        else:
+            tmp_petals[petals] = [pos]
+
+    # 15 到 7 倒序遍历
+    p = 15
+    while p >= 7:
+        if p in tmp_petals:
+            for pos in tmp_petals[p]:
+                while not spawn_drone(harvest_sunflower(pos[0], pos[1])):
+                    do_a_flip()
+        util.wait_drones_done()
+        p -= 1
 
 
 # 尝试种植南瓜
@@ -333,10 +383,61 @@ def try_sort_and_harvest_cactus():
     try_harvest()
 
 
+# 多无人机种植仙人掌
+def drones_plant_cactus():
+    world_size = get_world_size()
+
+    # 播种任务, 尝试种植仙人掌
+    def plant_cactus_task():
+        for i in range(world_size):
+            try_planting_cactus()
+            move(East)
+
+    # 排序任务, 尝试对种植的仙人掌进行排序
+    def sort_cactus_task(dir):
+        def task():   
+            n = get_world_size()
+            x, y = get_pos_x(), get_pos_y()
+            for i in range(n):
+                util.goto_xy(x, y)
+                swapped = False
+                for j in range(0, n - i - 1):
+                    dir_size = measure(dir)
+                    if dir_size == None:
+                        swap(dir)
+                        plant_cactus()
+                        swap(dir)
+                        dir_size = measure(dir)
+
+                    if measure() > dir_size:
+                        swap(dir)
+                        swapped = True
+                    move(dir)
+                if not swapped:
+                    break  # 这一行已经有序，提前结束
+        return task
+
+    # 先种植仙人掌
+    util.do_spawn_drone(plant_cactus_task)
+    # 对横向的仙人掌进行排序
+    util.do_spawn_drone(sort_cactus_task(East))
+    # 等待横向的仙人掌排序完毕
+    util.wait_drones_done()
+    # 对纵向的仙人掌进行排序
+    util.do_spawn_drone(sort_cactus_task(North), East)
+    # 等待纵向的仙人掌排序完毕
+    util.wait_drones_done()
+    # 尝试收获
+    util.goto_xy(0, 0)
+    try_harvest()
+
+
 # 尝试养恐龙来收获骨头
 def try_feed_dinosaur():
+    if get_entity_type() != None:
+        clear()
+    
     start_time = get_time()
-
     def log_fun(start, apple_num):
         # 计算吃一个苹果所需要的平均时间
         time = get_time() - start
@@ -533,6 +634,5 @@ def try_harvest(fun=util._always_true):
     if fun() and can_harvest():
         return harvest()
     elif get_entity_type() == Entities.Dead_Pumpkin:
-        till()
+        harvest()
     return False
-

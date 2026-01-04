@@ -4,17 +4,15 @@ Min_Bone = 3000000
 Min_Cactus = 3000000
 # 最小的胡萝卜数量
 Min_Carrot = 300000
-# 最小的化肥数量
-Min_Fertilizer = 3000000
-Min_Gold = 3000000
+# 最小的金块数量
+Min_Gold = 300000
 # 最小的干草数量
 Min_Hay = 300000
 Min_Piggy = 3000000
 # 最小的能量数量
 Min_Power = 30000
+# 最小的南瓜数量
 Min_Pumpkin = 300000
-# 最小的水数量
-Min_Water = 3000000
 # 最小的怪异物质数量
 Min_Weird_Substance = 3000000
 # 最小的木头数量
@@ -37,14 +35,6 @@ plan_farm = getFram(None)
 # print(farm)
 # 定义一个向日葵花瓣的字典, 用来记录最大的花瓣数
 petals_dict = {}
-# 定义一个记录坏南瓜的相关字典
-bad_pumpkin_list = []
-# 定义一个记录坏南瓜的相关字典
-bad_pumpkin_dict = {}
 # 定义一个记录坏南瓜的相关列表
-bad_pumpkin = getFram(None)
-# 是否允许收获南瓜
-allow_harvest_pumpkin = False
-# 是否允许收获仙人掌
-allow_harvest_cactus = False
-world_size = get_world_size()
+bad_pumpkin_list = []
+
